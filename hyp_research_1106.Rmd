@@ -1,0 +1,530 @@
+---
+title: "Hyp_Master"
+author: "Joshua Olabisi"
+date: "11/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(treemapify)
+library(dplyr)
+library(lubridate)
+library(scales)
+library(viridis)
+library(ggthemes)
+library(ggsci)
+library(plotly)
+```
+
+
+### Read master file, survey data file and merge the columns to match patients.
+```{r cars}
+junejulymaster <- read.csv("https://raw.githubusercontent.com/jordanrosedouglass/hypertension_research/master/JuneJulyMasterFile.csv")
+
+survey_dat <- read.csv("https://raw.githubusercontent.com/jordanrosedouglass/hypertension_research/master/Questionnaire_Data_oct19.csv")
+
+mastersurveymonths <- merge(junejulymaster, survey_dat, by=c('MRN'), all.x=T)
+```
+
+```{r}
+head(master2data)
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r blood pressure chunk}
+master2data = mastersurveymonths %>% 
+  filter(!is.na(BP_Sys), !is.na(BP_Dia), !is.na(HeartRate)) %>% 
+  mutate(
+    blood_pressure = ifelse(BP_Sys > 130 | BP_Dia > 90, "High", "Normal"),
+  h_rate = ifelse(HeartRate >= 145, "High", "Normal")  )
+```
+
+
+```{r bp long transform}
+long = master2data %>%
+  select(BP_Dia, BP_Sys, HeartRate, ) %>% 
+  gather(bp, value, BP_Dia:BP_Sys) %>% 
+  mutate(bp = recode(bp, `BP_Dia` = "Diastolic", `BP_Sys` = "Systolic"))
+```
+
+
+## Comparing Blood Pressure and Heart Rate
+```{r plots1}
+ggplot(master2data, aes(BP_Dia, HeartRate)) + 
+  geom_point(alpha = 0.7, size = 2, color = "#3C4D54") +
+  theme_hc() +
+  theme(text = element_text(family = "serif", size = 11), legend.position="top") +
+  xlab("Diastolic blood pressure (mm Hg)") +
+  ylab("Heart Rate") +
+  ggtitle("Dyastolic blood pressure vs. Heart Rate") +
+  labs(caption = "Source: Biodatix Wearable Collection")
+```
+
+try * both systolic and diastolic plots^^^
+
+
+```{r plots2}
+ggplot(long, aes(value, HeartRate, color = bp)) +
+  geom_point(alpha = 0.7, size = 2) +
+  scale_color_jama() +
+  theme_hc() +
+  theme(text = element_text(family = "serif", size = 11), legend.position="top") +
+  xlab("Blood pressure (mm Hg)") +
+  ylab("Heart Rate (BPM)") +
+  ggtitle("Blood pressure vs. Heart Rate") +
+  labs(
+    caption = "Source: Biodatix Wearable Collection",
+    col="Blood pressure")
+```
+
+
+
+```{r plots3}
+ggplot(long, aes(value, HeartRate, color = bp)) +
+  geom_point(alpha = 0.7, size = 2) +
+  geom_smooth(colour="#479FD0") +
+  facet_grid(~bp) + 
+  scale_color_jama() +
+  theme_hc() +
+    theme(text = element_text(family = "serif", size = 11), legend.position="none") +
+  xlab("Blood pressure (mm Hg)") +
+  ylab("Heart Rate") +
+  ggtitle("Blood pressure vs. Heart Rate") +
+  labs(
+    caption = "Source: Biodatix Wearable Collection")
+```
+
+
+
+
+```{r plot4}
+ggplot(master2data, aes(x = DateSplit, y = BP_Sys))+
+  geom_point(color = "#00AFBB", size = 2)
+# Plot a subset of the data
+dateplots <- subset(master2data, DateSplit > as.Date("2020-06-01"))
+ggplot(data = ss, aes(x = DateSplit, y = BP_Dia)) + 
+  group_by(DateSplit) +
+  mean(BP_Sys, na.rm = TRUE) +
+  geom_point(color = "#FC4E07", size = 2)
+
+```
+
+```{r}
+head(master2data)
+```
+
+```{r}
+paste(master2data$DateSplit, master2data$TimeSplit)
+```
+
+
+## Understanding Date and Time
+```{r}
+master2data %>%
+  mutate(My_date = mdy_hm(paste(DateSplit, TimeSplit)))
+```
+
+```{r}
+master2data %>%
+  mutate(My_date = mdy_hm(paste(DateSplit, TimeSplit))) %>%
+  mutate(Time_of_day_morning = 
+           case_when(hm(TimeSplit) < hm("11:59")~"Morning", 
+                     TRUE~"Not Morning")) 
+```
+
+```{r}
+master2data %>%
+  mutate(My_date = mdy_hm(paste(DateSplit, TimeSplit))) %>%
+  mutate(Time_of_day_afternoon = 
+           case_when(hm(TimeSplit) > hm("11:59")~"Afternoon",  
+                     TRUE~"Not Afternoon"))
+```
+
+```{r}
+master2data %>%
+  mutate(My_date = mdy_hm(paste(DateSplit, TimeSplit))) %>%
+  mutate(Time_of_day_night = 
+           case_when(hm(TimeSplit) > hm("17:59")~"Night",  
+                     TRUE~"Not Night")) 
+```
+
+## Average Daily Systolic Blood Pressure
+```{r}
+master2data %>% 
+  filter(!is.na(BP_Sys)) %>%
+  group_by(DateSplit) %>%
+  summarise(Ave_Sys = mean(BP_Sys, na.rm = TRUE))
+  
+```
+
+## Average Daily Diastolic Blood Pressure
+```{r}
+master2data %>% 
+  filter(!is.na(BP_Dia)) %>%
+  group_by(DateSplit) %>%
+  summarise(Ave_Dia = mean(BP_Dia, na.rm = TRUE))
+```
+
+
+```{r}
+master2data %>% 
+  filter(!is.na(BP_Sys)) %>%
+  group_by(MRN, DateSplit, blood_pressure, TimeSplit) %>%
+  summarise(Ave_Sys = mean(BP_Sys, na.rm = TRUE))
+```
+
+```{r}
+master2data %>% 
+  filter(!is.na(BP_Dia)) %>%
+  group_by(MRN, DateSplit) %>%
+  summarise(Ave_Dia = mean(BP_Dia, na.rm = TRUE))
+```
+
+```{r}
+
+```
+
+
+```{r}
+format( as.Date("DateSplit", "%m/%d/%Y"), format="%m/%d")
+```
+
+
+
+```{r}
+master2data %>% 
+  filter(!is.na(BP_Sys)) %>%
+  group_by(DateSplit) %>%
+  summarise(Ave_Sys = mean(BP_Sys, na.rm = TRUE)) %>%
+ggplot(aes(x = DateSplit, y = Ave_Sys))+
+  geom_point(color = "Blue", size = 2) +
+  theme(legend.position="right",
+              axis.text = element_text(angle = 90, vjust = 0.6))
+#ggplotly()
+```
+
+```{r}
+mastersurveymonths %>% 
+  filter(!is.na(BP_Dia)) %>%
+  group_by(DateSplit) %>%
+  summarise(Ave_Dia = mean(BP_Dia, na.rm = TRUE)) %>%
+ggplot(aes(x = DateSplit, y = Ave_Dia))+
+  geom_point(color = "Blue", size = 2) +
+  theme(legend.position="right",
+              axis.text = element_text(angle = 90, vjust = 0.6))
+#ggplotly()
+```
+
+
+```{r}
+ggplot(data = master2data) +
+  geom_point(aes(x = `Are.you.currently.a.student.`, y = `MRN`, color = `Gender`, size = `Age`))
+```
+
+
+```{r}
+ggplot(master2data, aes(`BP_Sys`, `BP_Dia`)) +
+  geom_line(aes(colour = `Age`)) + 
+  labs(title = "",
+       x = "",
+       y = "",
+       caption = "Plot 1; Data: PT3768") +
+      theme_minimal() +
+       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.title = element_blank(), legend.position = "none", plot.title = element_text(face="bold")) +
+      coord_cartesian(xlim = c(80, 200), ylim = c(0, 150), expand = FALSE)
+```
+
+
+```{r plot5}
+j3 <- ggplot(mastersurveymonths,
+             aes(x = BP_Sys,
+                 y = Age
+)) + 
+        theme(legend.position="right",
+              axis.text = element_text(angle = 20, vjust = 0.6))
+(j3a <- j3 + geom_point(aes(color = MRN),
+                       alpha = 0.5,
+                       size = 1.5,
+                       position = position_jitter(width = 0.25, height = 0)))
+#ggplotly()
+```
+
+```{r}
+boxsys <- boxplot(BP_Sys~Gender, data=mastersurveymonths,
+                  col='green',
+                  ylab = "Systolic Blood Pressure",
+                  title = "Systolic Pressure by Gender",
+                  rm.na=TRUE)
+
+```
+
+
+
+
+```{r}
+boxdia <- boxplot(BP_Dia~Gender, data=mastersurveymonths,
+                  col='green',
+                  ylab = "Diastolic Blood Pressure",
+                  title = "Diastolic Pressure by Gender",
+                  rm.na=TRUE)
+```
+
+```{r}
+boxHR <- boxplot(HeartRate~Gender, data=mastersurveymonths,
+                  col='green',
+                  ylab = "Heart rate",
+                  title = "Heart rate by Gender",
+                  rm.na=TRUE)
+```
+
+
+```{r}
+boxracesys <- boxplot(BP_Sys~Race, data=mastersurveymonths,
+                  col='Blue',
+                  ylab = "Systolic Blood Pressure",
+                  title = "Systolic Pressure by Race",
+                  rm.na=TRUE)
+```
+
+```{r}
+boxracedia <- boxplot(BP_Dia~Race, data=mastersurveymonths,
+                  col='Purple',
+                  ylab = "Diastolic Blood Pressure",
+                  title = "Diastolic Pressure by Race",
+                  rm.na=TRUE)
+```
+
+```{r}
+boxHRrace <- boxplot(HeartRate~Race, data=mastersurveymonths,
+                  col='Purple',
+                  ylab = "Heart rate",
+                  title = "Heart rate by Gender",
+                  rm.na=TRUE)
+```
+
+
+```{r}
+boxagesys <- boxplot(BP_Sys~Age, data=mastersurveymonths,
+                  col='Blue',
+                  ylab = "Systolic Blood Pressure",
+                  title = "Systolic Pressure by Age",
+                  rm.na=TRUE)
+```
+
+```{r}
+boxagedia <- boxplot(BP_Dia~Age, data=mastersurveymonths,
+                  col='Blue',
+                  ylab = "Diastolic Blood Pressure",
+                  title = "Diastolic Pressure by Age",
+                  rm.na=TRUE)
+```
+
+```{r}
+boxHRage <- boxplot(HeartRate~Age, data=mastersurveymonths,
+                  col='Blue',
+                  ylab = "Heart rate",
+                  title = "Heart rate by Gender",
+                  rm.na=TRUE)
+```
+
+```{r}
+Age <- mastersurveymonths %>%
+  (`Age` = c(18,24,34,39)) %>%
+labels = c("18-25", "26-39") 
+```
+
+
+```{r}
+master2data %>% group_by(MRN,
+                         Race, 
+                  Gender, 
+                  Age) %>% 
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+
+```
+
+```{r}
+master2data %>% group_by(MRN,
+                         Race, 
+                  Gender == "Male", 
+                  Age) %>% 
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+```
+
+
+
+
+```{r}
+All_Hisp <- master2data %>%
+  filter(Race == "Hispanic")
+head(All_Hisp)
+```
+
+```{r}
+All_Hisp <- master2data %>%
+  filter(Race == "Hispanic") %>%
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+head(All_Hisp)
+```
+
+
+```{r}
+All_White <- master2data %>% 
+  filter(Race == "White")
+head(All_White)
+```
+
+```{r}
+All_White <- master2data %>%
+  filter(Race == "White") %>%
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+head(All_White)
+```
+
+
+```{r}
+All_Asian <- master2data %>%
+  filter(Race == "Asian") 
+head(All_Asian)
+```
+
+```{r}
+All_Asian <- master2data %>%
+  filter(Race == "Asian") 
+head(All_Asian)%>%
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+```
+
+```{r}
+All_Male_Gender <- master2data %>%
+  filter(Gender == "Male") %>%
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+All_Male_Gender
+```
+
+```{r}
+All_Female_Gender <- master2data %>%
+  filter(Gender == "Female") %>%
+  summarize(mean_Sys_BP = mean(BP_Sys), mean_Dia_BP = mean(BP_Dia),  mean_HR = mean(HeartRate), sd_Sys_BP = sd(BP_Sys), sd_Dia_BP = sd(BP_Dia))
+All_Female_Gender
+```
+
+```{r}
+pvalue(15.78956, 7.78323)
+```
+
+
+```{r}
+j2 <- ggplot(master2data,
+             aes(x = HeartRate,
+                 y = Age
+)) + 
+        theme(legend.position="right",
+              axis.text = element_text(angle = 20, vjust = 0.6))
+(j2a <- j2 + geom_point(aes(color = MRN),
+                       alpha = 0.5,
+                       size = 1.5,
+                       position = position_jitter(width = 0.25, height = 0)))
+```
+
+
+```{r}
+ggplot(master2data, aes(x= str_wrap("Time_of_day", width = 5), y=`blood_pressure`, fill = `Race`)) + 
+  geom_bar(stat = "identity") +  theme(legend.position="right")
+  #xlab("Education") + ylab("Percentage")
+```
+
+
+
+```{r}
+j5 <- ggplot(mastersurveymonths,
+             aes(x = Are.you.on.any.prescribed.medications.,
+                 y = HeartRate)) + 
+        theme(legend.position="right",
+              axis.text = element_text(angle = 20, vjust = 0.6))
+(j5a <- j5 + geom_point(aes(color = Race),
+                       alpha = 0.5,
+                       size = 1.5,
+                       position = position_jitter(width = 0.25, height = 0)))
+#ggplotly()
+```
+
+```{r}
+master2data %>%
+  ggplot(aes(x = BP_Sys, y = `HeartRate`, group = `DateSplit`, color = `MRN`)) + geom_line(show.legend = FALSE) + ylab("HeartRate") +  xlab("BP_Sys") + ggtitle("Systolic BP and Heart Rate Trend") + theme_linedraw()
+#ggplotly()
+```
+
+```{r}
+master2data %>%
+  ggplot(aes(x = BP_Sys, y = `HeartRate`, group = `Race`, color = `MRN`)) + geom_line(show.legend = FALSE) + ylab("HeartRate") +  xlab("BP_Sys") + ggtitle("Systolic BP and Heart Rate Trend") + theme_linedraw()
+#ggplotly()
+```
+
+```{r}
+P1 <- ggplot(filter(master2data, `Age` %in% c("18 - 24", "25 - 39")),
+         aes(x = BP_Sys, y = `HeartRate`) +
+        theme(legend.position="right",
+              axis.text = element_text(angle = 20, vjust = 0.6)))
+
+```
+
+```{r}
+j2 <- ggplot(master2data,
+             aes(x = Gender,
+                 y = BP_Sys)) + 
+        theme(legend.position="right",
+              axis.text = element_text(angle = 20, vjust = 0.6))
+(j2a <- j2 + geom_point(aes(color = HeartRate),
+                       alpha = 0.5,
+                       size = 1.5,
+                       position = position_jitter(width = 0.25, height = 0)))
+j2a +
+  scale_x_discrete(name="Gender") +
+  scale_color_continuous(name="",
+                         breaks = c(10, 40, 60),
+                         labels = c("10", "40", "60"),
+                         low = "blue", high = "red") 
+```
+
+```{r}
+Hyp_Ages <- master2data %>%
+  filter(`Age` %in% c("18-25", "26-39"))
+Hyp_Ages
+```
+
+```{r}
+labs <- c(paste(seq(0, 95, by = 5), seq(0 + 5 - 1, 100 - 1, by = 5),
+                sep = "-"), paste(100, "+", sep = ""))
+labs
+```
+
+
+
+
+
+```{r}
+master2data %>% 
+  ggplot(aes(x = BP_Sys, y = `HeartRate`, group = `Age`, color = `MRN`)) + geom_line(show.legend = FALSE) + ylab("HeartRate") +  xlab("BP_Sys") + ggtitle("Systolic BP and Heart Rate Trend") + theme_linedraw()
+#ggplotly()
+```
+
+```{r}
+mastersurveymonths %>%
+  ggplot(aes(x = `How.often.do.you.exercise.`, y = `BP_Sys`, color = `Energy.drinks.`, size = `Age`)) + geom_point(alpha = .5) + theme(legend.position="right",
+              axis.text = element_text(angle = 90, vjust = 0.6))
+```
+
+```{r}
+mastersurveymonths %>%
+  ggplot(aes(x = `How.often.do.you.exercise.`, y = `BP_Sys`, group = `Age`, color = `MRN`, size =`Energy.drinks.`)) + geom_line(show.legend = FALSE) + ylab("HeartRate") +  xlab("BP_Sys") + ggtitle("Systolic BP and Heart Rate Trend") + theme_linedraw()
+#ggplotly()
+```
+
