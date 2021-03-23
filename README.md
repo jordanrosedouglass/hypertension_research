@@ -12,6 +12,6 @@ BioDatix watch devices - data collected includes variables:
 These variables are collected in fifteen minutes intervals while participants are wearing the device; the exception being steps which are accumulated and stored
 at one-hour intervals.
 
-Through a participant survey, also collected are 
+Through a participant survey, also collected are several observations of social determinants of health. These will be used in the study as factors for risk assessment in model development.
 
 
